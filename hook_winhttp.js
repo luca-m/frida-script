@@ -1,5 +1,10 @@
 
 // Utils
+
+function log(message){
+  send({log:'['+new Date().toISOString()+'] '+message});
+}
+
 function endsWith(str, suffix) {
   return str.indexOf(suffix, str.length - suffix.length) !== -1;
 };
@@ -54,60 +59,100 @@ function i_WinHttpConnect(fname, msg, args){
     dest : read_string_param(fname, srvname) +':'+port
   };
 };
-function o_WinWinHttpReadData(fname, msg, args){
+function i_WinHttpReadData(fname, msg, args){
+  //  _In_   HINTERNET hRequest,
+  var buff  = ptr(args[1]); //  _Out_  LPVOID lpBuffer,
+  //  _In_   DWORD dwNumberOfBytesToRead,
+  var pbufflen = ptr(args[3]); //  _Out_  LPDWORD lpdwNumberOfBytesRead
+  this.http_WinHttpReadData_buff = buff;
+  this.http_WinHttpReadData_pbufflen = pbufflen;
+};
+function o_WinHttpReadData(fname, msg, retfal){
   //  _In_   HINTERNET hRequest,
   //  _Out_  LPVOID lpBuffer,
   //  _In_   DWORD dwNumberOfBytesToRead,
   //  _Out_  LPDWORD lpdwNumberOfBytesRead
   // TODO
+  var buff = this.http_WinHttpReadData_buff;
+  var pbufflen = this.http_WinHttpReadData_pbufflen;
   msg.http_resp = {
     time : new Date().toISOString(),
+    resp : Memory.readByteArrat(buff, Memory.readU32(pbufflen) )
   };
 };
 
 // Code
+
 var exportcallbacks = {};
 exportcallbacks.onMatch = function (mod){
-  if (/Http/.test(mod.name) ){
-    var fname = mod.name;
+  var fname = mod.name;
+  if (/^HttpSendRequest/.test(mod.name) ){
+    log('hooking '+fname);
     Interceptor.attach(ptr(mod.address), {
       onEnter: function(args) {
         var c = {t:new Date().toISOString(), f:fname};
-        switch (true){
-          case /HttpSendRequest/.test(fname):
-          send({log:'['+new Date().toISOString()+'] hooking HttpsendRequest.'});
-          i_WinHttpSendRequest(fname, c, args);
-          break;
-          case /HttpOpenRequest/.test(fname):
-          send({log:'['+new Date().toISOString()+'] hooking HttpOpenRequest.'});
-          i_WinHttpOpenRequest(fname, c, args);
-          break;
-          case /HttpConnect/.test(fname):
-          send({log:'['+new Date().toISOString()+'] hooking HttpConnect.'});
-          i_WinHttpConnect(fname, c, args);
-          break;                    
-          default:
-          //for(var i=0; i<10; i++){ c['args_'+i] = read_string_param(fname, args[i]); };
-          break;
-        }
+        i_WinHttpSendRequest(fname, c, args);
         send(c);
       },
       onLeave: function(retval){ 
-        // TODO: hook on exit
         return retval; 
       }
     });
-  }
+    return;
+  } 
+  if (/^HttpOpenRequest/.test(mod.name) ){
+    log('hooking '+fname);
+    Interceptor.attach(ptr(mod.address), {
+      onEnter: function(args) {
+        var c = {t:new Date().toISOString(), f:fname};
+        i_WinHttpOpenRequest(fname, c, args);
+        send(c);
+      },
+      onLeave: function(retval){ 
+        return retval; 
+      }
+    });
+    return;
+  } 
+  if (/^HttpConnect/.test(mod.name) ){
+    log('hooking '+fname);
+    Interceptor.attach(ptr(mod.address), {
+      onEnter: function(args) {
+        var c = {t:new Date().toISOString(), f:fname};
+        i_WinHttpConnect(fname, c, args);
+        send(c);
+      },
+      onLeave: function(retval){ 
+        return retval; 
+      }
+    });
+    return;
+  } 
+  if (/^HttpReadData/.test(mod.name) ){
+    log('hooking '+fname);
+    Interceptor.attach(ptr(mod.address), {
+      onEnter: function(args) {
+        i_WinHttpReadData(fname, c, args);
+      },
+      onLeave: function(retval){ 
+        var c = {t:new Date().toISOString(), f:fname};
+        o_WinHttpReadData(fname, c, retval);
+        send(c);
+        return retval; 
+      }
+    });
+    return;
+  } 
 };
 exportcallbacks.onComplete = function (){};
 
 var modulecallbacks={};
 modulecallbacks.onMatch = function (module){
-  Module.enumerateExports(module.name, exportcallbacks );  
+  Module.enumerateExports( module.name, exportcallbacks );  
   return;
 };
 modulecallbacks.onComplete = function (){
-  send({log:'['+new Date().toISOString()+'] module enumeration done.'});
+  log('module enumeration done');
   return;
 };
 

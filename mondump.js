@@ -1,5 +1,9 @@
 
 // Utils
+
+function log(message){
+  send({log:'['+new Date().toISOString()+'] '+message});
+}
 function endsWith(str, suffix) {
   return str.indexOf(suffix, str.length - suffix.length) !== -1;
 };
@@ -23,11 +27,13 @@ var pattern = '%(pattern)s';
 
 function match_found (address, size){
 	var data =read_string_param('A',address, -1);
-	send({addr:address.toInt32(), time: new Date().toISOString() , data:data});
+	send({ time:new Date().toISOString(),
+         addr:address.toInt32(), 
+         data:data });
 }
 
 function scan_memory(){
-  send({ log:'[-] starting memory scan at '+ new Date().toISOString() });
+  log('starting memory');
 	Process.enumerateRanges('rw-', {
 		onMatch: function onMatch(range){
 			Memory.scan(range.base, range.size, pattern, {
@@ -37,7 +43,7 @@ function scan_memory(){
 			})
 		},
 		onComplete: function onComplete(){
-      send({ log:'[-] memory scan completed at '+ new Date().toISOString() });
+      log('memory scan completed');
     }
 	});
 	
@@ -45,6 +51,6 @@ function scan_memory(){
 }
 // Main
 
-var scan_timer = setTimeout(scan_memory, %(msecs) )
+var scan_timer = setTimeout(scan_memory, %(msecs)d )
 
 
